@@ -5,11 +5,9 @@ from typing import List, Dict
 import time
 from collections import Counter
 
-# Load NLP models
 nlp = spacy.load("en_core_web_sm")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Expanded product category list
 PRODUCT_CATEGORIES = [
     "Pain Relief", "Health & Wellness", "Medications", "Supplements", "Vitamins",
     "Air Purifiers", "Ergonomic Furniture", "Office Chairs", "Smartphones", "Laptops",
@@ -26,11 +24,14 @@ def is_similar(a: str, b: str, threshold: float = 0.85) -> bool:
     return SequenceMatcher(None, a, b).ratio() >= threshold
 
 def extract_primary_topics(text: str, top_k: int = 3) -> List[str]:
+    """
+    Extracting primary topics from the conversation using spacy NLP model - nouns, named entity etc and then comparing it with the llm embeddings here I used MiniLM 
+    to keep only those keywords which have some contextual similarity is useful for commercial purpose
+    """
     doc = nlp(text)
     candidates = set()
     named_entities = set()
 
-    # Collect named entities (to boost later)
     for ent in doc.ents:
         if ent.label_ in {"PRODUCT", "ORG", "GPE", "NORP", "PERSON", "FAC", "LAW"} or ent.label_.endswith("LOC"):
             cleaned = ent.text.lower().strip()
@@ -38,7 +39,6 @@ def extract_primary_topics(text: str, top_k: int = 3) -> List[str]:
                 named_entities.add(cleaned)
                 candidates.add(cleaned)
 
-    # Extract noun phrases
     for chunk in doc.noun_chunks:
         tokens = [token for token in chunk 
                   if token.pos_ in {"NOUN", "PROPN", "ADJ"} 
@@ -49,29 +49,24 @@ def extract_primary_topics(text: str, top_k: int = 3) -> List[str]:
         if 2 <= len(lemmatized) <= 50:
             candidates.add(lemmatized.strip())
 
-    # Add fallback: standalone nouns and proper nouns
     for token in doc:
         if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop and token.is_alpha:
             candidates.add(token.lemma_.lower().strip())
 
-    # Filter short/duplicate junk
     candidates = list(set(c for c in candidates if len(c) > 2 and not c.isdigit()))
     if not candidates:
         return []
 
-    # Embed text + candidate phrases
     with torch.no_grad():
         embeddings = embedder.encode([text] + candidates, convert_to_tensor=True)
         similarities = util.cos_sim(embeddings[0], embeddings[1:])[0]
 
-    # Rank candidates with a named-entity bonus
     ranked = sorted(
         zip(candidates, similarities.tolist()),
         key=lambda x: (x[0] in named_entities, x[1]),
         reverse=True
     )
 
-    # Filter for uniqueness (no overlaps or fuzzy duplicates)
     final_topics = []
     for phrase, _ in ranked:
         if any(phrase in t or t in phrase or is_similar(phrase, t) for t in final_topics):
@@ -83,8 +78,10 @@ def extract_primary_topics(text: str, top_k: int = 3) -> List[str]:
     return final_topics
 
 
-# Step 2: Commercial Intent — left unchanged (placeholder logic)
 def estimate_commercial_intent(text: str, primary_topics: List[str]) -> float:
+    """
+    This is a simple commercial intent prediction which just checking keywords in it to score
+    """
     score = 0.1
     lower_text = text.lower()
     indicators = ["need", "buy", "purchase", "recommend", "looking for", "problem", "tried", "help"]
@@ -95,8 +92,10 @@ def estimate_commercial_intent(text: str, primary_topics: List[str]) -> float:
         score += 0.2
     return min(score, 1.0)
 
-# Step 3: Product Category Matching (improved with top-k + normalization)
 def match_product_categories(primary_topics: List[str], threshold: float = 0.5, top_k: int = 5) -> List[str]:
+    """
+    Matching the primary topics with the product categories that we stored in list using sentence transformer only and comparing it using cosine similarity
+    """
     if not primary_topics:
         return []
 
@@ -107,12 +106,10 @@ def match_product_categories(primary_topics: List[str], threshold: float = 0.5, 
         avg_embedding = torch.mean(topic_embeddings, dim=0, keepdim=True)
         similarities = util.cos_sim(avg_embedding, CATEGORY_EMBEDDINGS)[0]
 
-    # Get top-k categories above threshold
     top_indices = torch.topk(similarities, k=top_k).indices.tolist()
     best_matches = [PRODUCT_CATEGORIES[i] for i in top_indices if similarities[i] >= threshold]
     return best_matches
 
-# Full Pipeline
 def analyze_conversation(text: str) -> Dict:
     start_time = time.perf_counter()
     primary_topics = extract_primary_topics(text)
