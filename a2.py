@@ -16,7 +16,6 @@ embedder = SentenceTransformer("all-MiniLM-L6-v2")
 def is_similar(a: str, b: str, threshold: float = 0.85) -> bool:
     return SequenceMatcher(None, a, b).ratio() >= threshold
 
-# ---- 1. Improved Primary Topic Extraction ----
 def extract_primary_topics(text, top_k=3):
     """
     Extracts and ranks the most relevant noun-based phrases from the conversation text,
@@ -77,8 +76,7 @@ def extract_primary_topics(text, top_k=3):
 
     return final_topics
 
-# ---- 2. Use Groq LLM for Commercial Analysis ----
-def call_groq_for_commercial_analysis(primary_topics):
+def rag_method(primary_topics):
     api_url = "https://api.groq.com/openai/v1/chat/completions"
     api_key = "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"  
 
@@ -134,7 +132,7 @@ Only output valid JSON:
 # ---- 3. Main Pipeline ----
 def analyze_conversation(conversation_text):
     primary_topics = extract_primary_topics(conversation_text)
-    llm_response, latency = call_groq_for_commercial_analysis(primary_topics)
+    llm_response, latency = rag_method(primary_topics)
 
     return {
         "primary_topics": primary_topics,
