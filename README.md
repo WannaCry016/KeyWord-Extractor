@@ -4,7 +4,7 @@ So I have tried 3 approaches to see which worked the best with the required late
 
 ---
 
-## `1.py`
+## `a1.py`
 
 So In this approach I tried to extract all keywords using spacy NLP model for Named Entity Recognition - this extracted all the noun chunks, named entities (product, organisations) etc.  
 Then we have to keep the keywords up to the context of commercial intent so for that I used sentence embeddings of a small but fast llm which converted the conversation into embeddings and then did the matching using cosine similarity to get the keywords that best suite to the context and removed the Similar or overlapping phrases are filtered using fuzzy matching.  
@@ -17,7 +17,7 @@ So this has potential to work in very less latency if the commercial intent and 
 
 ---
 
-## `2.py`
+## `a2.py`
 
 In this approach I used RAG method so I extracted the keyword normally through the 1st approach and gave it to a llm using a cloud api (I have used groq) with the other task to predict the commercial intent and product categories.  
 This worked great with respect to the product categories but commercial intent was not that relevant as it was not able to get the full intent by seeing the keywords only and was giving avg latency of around 500 ms which ig could be improved if worked with entripise level api and good network conditions.
@@ -26,7 +26,7 @@ This worked great with respect to the product categories but commercial intent w
 
 ---
 
-## `3.py`
+## `a3.py`
 
 In this I completely gave the converstation and the task to the llm using api and It was working great in keyword , intent scoring and product category with avg latency around 500 which could be definitely improved with enterprise lvl api.
 
