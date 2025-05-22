@@ -36,4 +36,4 @@ In this I completely gave the converstation and the task to the llm using api an
 
 ## Conclusion
 
-So to conclude the 3rd one seems to be the best approach till now as we need a model which understands the context then only we will be able to score and get the keywords well from there.
+So to conclude the 3rd one seems to be the best approach till now as we need a model which understands the context then only we will be able to score and get the keywords well from there. It is showing little more latency but it can work in under 200ms as I was using free api so its queued in public stack.
