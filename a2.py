@@ -9,7 +9,6 @@ import os
 import json
 from difflib import SequenceMatcher
 
-# Load NLP and embedding models
 nlp = spacy.load("en_core_web_sm")
 embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -25,7 +24,6 @@ def extract_primary_topics(text, top_k=3):
     candidates = set()
     named_entities = set()
 
-    # Collect named entities for scoring boost
     for ent in doc.ents:
         if ent.label_ in {"PRODUCT", "ORG", "GPE", "NORP", "PERSON", "FAC", "LAW"} or ent.label_.endswith("LOC"):
             cleaned = ent.text.lower().strip()
@@ -33,7 +31,6 @@ def extract_primary_topics(text, top_k=3):
                 named_entities.add(cleaned)
                 candidates.add(cleaned)
 
-    # Noun phrase extraction
     for chunk in doc.noun_chunks:
         tokens = [token for token in chunk 
                   if token.pos_ in {"NOUN", "PROPN", "ADJ"} 
@@ -44,17 +41,14 @@ def extract_primary_topics(text, top_k=3):
         if 2 <= len(lemmatized) <= 50:
             candidates.add(lemmatized.strip())
 
-    # Fallback: individual nouns and proper nouns
     for token in doc:
         if token.pos_ in {"NOUN", "PROPN"} and not token.is_stop and token.is_alpha:
             candidates.add(token.lemma_.lower().strip())
 
-    # Filter out short or junk tokens
     candidates = list(set(c for c in candidates if len(c) > 2 and not c.isdigit()))
     if not candidates:
         return []
 
-    # Embed and rank candidates
     with torch.no_grad():
         embeddings = embedder.encode([text] + candidates, convert_to_tensor=True)
         similarities = util.cos_sim(embeddings[0], embeddings[1:])[0]
@@ -65,7 +59,6 @@ def extract_primary_topics(text, top_k=3):
         reverse=True
     )
 
-    # Remove near-duplicates
     final_topics = []
     for phrase, _ in ranked:
         if any(phrase in t or t in phrase or is_similar(phrase, t) for t in final_topics):
@@ -77,6 +70,9 @@ def extract_primary_topics(text, top_k=3):
     return final_topics
 
 def rag_method(primary_topics):
+    """
+    Using cloud llm api to give the output - using primary topics as context to find the other relevant output
+    """
     api_url = "https://api.groq.com/openai/v1/chat/completions"
     api_key = "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"  
 
@@ -129,7 +125,7 @@ Only output valid JSON:
     except Exception as e:
         raise Exception(f"Failed to parse response: {e}\nRaw: {response.text}")
 
-# ---- 3. Main Pipeline ----
+
 def analyze_conversation(conversation_text):
     primary_topics = extract_primary_topics(conversation_text)
     llm_response, latency = rag_method(primary_topics)
@@ -141,7 +137,7 @@ def analyze_conversation(conversation_text):
         "latency_ms": latency
     }
 
-# ---- 4. Run Tests ----
+
 if __name__ == "__main__":
     test_cases = [
         "User: I've been having these headaches that won't go away.\nAssistant: I'm sorry to hear that. How long have you been experiencing them?\nUser: About two weeks now. I've tried basic painkillers but nothing helps.",
